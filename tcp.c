@@ -47,9 +47,9 @@ struct TCB *current_tcb;
 
 enum status{CLOSED,SYN_SENT,ESTABLISHED,FIN_WAIT1,FIN_WAIT2,TIME_WAIT};  
 
-int gSrcPort = 2008;
-int gDstPort = 2009;
-int gSeqNum = 1234;
+int gSrcPort = 2005;
+int gDstPort = 2006;
+int gSeqNum = 1;
 int gAckNum = 0;
 int socknum = 5;     
 
@@ -76,18 +76,16 @@ unsigned int getchecksum(bool fromLocal, tcphead* thead,unsigned int srcAddr, un
         checksum += ((thead->ackNo)>>16)+(thead->ackNo)&0xffff;
         checksum += ((thead->headLen)<<8)+thead->flag;
 
-       
-
         if(thead->flag == PACKET_TYPE_DATA){
                 checksum += len;
                 int length=len;
                 char* p=data;
                 while(length>0){
-                        checksum += (*p)<<8;
-                        p++;
-                        checksum += (*p);
-                        p++;
-                        length=length-2;
+                    checksum += (*p)<<8;
+                    p++;
+                    checksum += (*p);
+                    p++;
+                    length=length-2;
                 }
         }
 
@@ -98,8 +96,6 @@ unsigned int getchecksum(bool fromLocal, tcphead* thead,unsigned int srcAddr, un
         return checksum;
 
 }
-
-
 
 int stud_tcp_input(char *pBuffer, unsigned short len, unsigned int srcAddr, unsigned int dstAddr)
 {
@@ -126,7 +122,7 @@ int stud_tcp_input(char *pBuffer, unsigned short len, unsigned int srcAddr, unsi
             tcp_DiscardPkt(pBuffer, STUD_TCP_TEST_SEQNO_ERROR);   
             return -1;
     }
-
+    //状态转移
     switch(current_tcb->state)                                  
     {
         case SYN_SENT: 
@@ -140,6 +136,7 @@ int stud_tcp_input(char *pBuffer, unsigned short len, unsigned int srcAddr, unsi
             }
             else
               return -1;
+
         case ESTABLISHED:
             if(header->flag == PACKET_TYPE_ACK)
             {
@@ -159,6 +156,7 @@ int stud_tcp_input(char *pBuffer, unsigned short len, unsigned int srcAddr, unsi
             }
             else
                return -1;
+
         case FIN_WAIT1: 
           if(header->flag == PACKET_TYPE_ACK)
           {
@@ -169,6 +167,7 @@ int stud_tcp_input(char *pBuffer, unsigned short len, unsigned int srcAddr, unsi
           }
           else 
             return -1;
+
         case FIN_WAIT2:
             if(header->flag == PACKET_TYPE_FIN_ACK)
             {
@@ -178,12 +177,14 @@ int stud_tcp_input(char *pBuffer, unsigned short len, unsigned int srcAddr, unsi
             }
             else
                 return -1;
+
         default: 
             return -1;
 
     }
     return 0;
 }
+
 void stud_tcp_output(char *pData, unsigned short len, unsigned char flag, unsigned short srcPort, unsigned short dstPort, unsigned int srcAddr, unsigned int dstAddr)
 {
        
@@ -221,6 +222,7 @@ void stud_tcp_output(char *pData, unsigned short len, unsigned char flag, unsign
                  else 
                       return;
                  break;
+
              case ESTABLISHED:
                  if(flag == PACKET_TYPE_FIN_ACK)
                  {
@@ -234,6 +236,7 @@ void stud_tcp_output(char *pData, unsigned short len, unsigned char flag, unsign
                  else
                        return;
                  break;
+
              defalut:  
                 return;
         }
@@ -252,20 +255,21 @@ int stud_tcp_socket(int domain, int type, int protocol)
 {
        if(domain!=AF_INET || type!= SOCK_STREAM || protocol!=IPPROTO_TCP)
            return -1;
+
         current_tcb = new TCB;
         if(tcb_table==NULL){      
-                tcb_table = new tcb_node;
-                tcb_table->current = current_tcb;
-                tcb_table->next = NULL;
+            tcb_table = new tcb_node;
+            tcb_table->current = current_tcb;
+            tcb_table->next = NULL;
         }
         else{                     
-                tcb_node *head = tcb_table;
-                while(head->next != NULL){
-                        head = head->next;
-                }
-                head->next = new tcb_node;
-                head->next->current = current_tcb;
-                head->next->next = NULL;
+            tcb_node *head = tcb_table;
+            while(head->next != NULL){
+                    head = head->next;
+            }
+            head->next = new tcb_node;
+            head->next->current = current_tcb;
+            head->next->next = NULL;
         }
 
         current_tcb->sockfd = socknum++;  
@@ -282,15 +286,14 @@ int  getSockfd(int sockfd)
     tcb_node *current_p = tcb_table;
     while(current_tcb != NULL && current_p->current!=NULL)
     { 
-         if(current_p->current->sockfd == sockfd)
-         {
-                current_tcb = current_p->current;
-                return 0;
-                break;
-         }
-         current_p = current_p->next;
+       if(current_p->current->sockfd == sockfd)
+       {
+          current_tcb = current_p->current;
+          return 0;
+       }
+       current_p = current_p->next;
     }
-    if (current_p==NULL)
+    if(current_p==NULL)
        return -1;
 }
 
@@ -311,13 +314,14 @@ int stud_tcp_connect(int sockfd, struct sockaddr_in *addr, int addrlen)
     
     int res = -1;
     while(res == -1)      
-            res = waitIpPacket((char*)receive, 5000);
+        res = waitIpPacket((char*)receive, 5000);
 
 
    stud_tcp_input((char *)receive, 20, ntohl(current_tcb->srcAddr), ntohl(current_tcb->dstAddr));
     
    return 0;
 }
+
 int stud_tcp_send(int sockfd, const unsigned char *pData, unsigned short datalen, int flags)
 {
     if(getSockfd(sockfd)==-1) 
@@ -340,6 +344,7 @@ int stud_tcp_send(int sockfd, const unsigned char *pData, unsigned short datalen
     
     return 0;
 }
+
 int stud_tcp_recv(int sockfd, unsigned char *pData, unsigned short datalen, int flags)
 {
     if(getSockfd(sockfd)==-1) 
@@ -370,12 +375,12 @@ int stud_tcp_close(int sockfd)
 
     while(current_p != NULL && current_p->current!=NULL)
     {
-            if(current_p->current->sockfd == sockfd){
-                    current_tcb = current_p->current;
-                    break;
-            }
-            preCurrent=current_p;
-            current_p = current_p->next;
+        if(current_p->current->sockfd == sockfd){
+                current_tcb = current_p->current;
+                break;
+        }
+        preCurrent=current_p;
+        current_p = current_p->next;
     }
     if(current_p==NULL)
         return -1;
@@ -391,8 +396,9 @@ int stud_tcp_close(int sockfd)
         }
         else
              delete current_tcb;
+
         current_tcb=NULL;
-    return -1;
+        return -1;
     }
        
    stud_tcp_output(NULL, 0, PACKET_TYPE_FIN_ACK, current_tcb->srcPort, current_tcb->dstPort, srcAddr, dstAddr);
@@ -402,16 +408,14 @@ int stud_tcp_close(int sockfd)
    int res = -1;
    while(res == -1)
         res = waitIpPacket((char*)receive, 5000);
-
    stud_tcp_input((char *)receive, 20,ntohl(current_tcb->srcAddr), ntohl(current_tcb->dstAddr)); //ack
    
    res = -1;
    while(res == -1)
         res = waitIpPacket((char*)receive, 5000);
-
    stud_tcp_input((char *)receive, 20, ntohl(current_tcb->srcAddr), ntohl(current_tcb->dstAddr));//fin/ack
+   
    return 0;
-
 }
 
 
